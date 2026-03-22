@@ -5,7 +5,11 @@
 #include <algorithm>
 #include <chrono>
 #include <numeric>
+#include <set>
+#include <thread>
 #include <vector>
+
+#include <unistd.h>
 
 TEST(Future, BasicGetValue) {
     auto* state = pp::allocate_shared_state<int>();
@@ -75,6 +79,26 @@ TEST(ProcessPool, ExceptionInTask) {
         throw std::runtime_error("task failed");
     });
     EXPECT_THROW(fut.get(), std::runtime_error);
+}
+
+TEST(ProcessPool, WorkersAreReused) {
+    constexpr size_t num_workers = 2;
+    constexpr int num_tasks = 20;
+
+    pp::process_pool pool(num_workers);
+
+    std::vector<pp::future<pid_t>> futures;
+    for (int i = 0; i < num_tasks; ++i) {
+        futures.push_back(pool.submit([] { return getpid(); }));
+    }
+
+    std::set<pid_t> unique_pids;
+    for (auto& f : futures) {
+        unique_pids.insert(f.get());
+    }
+
+    // check that it's really pre-forked process pool
+    EXPECT_LE(unique_pids.size(), num_workers);
 }
 
 TEST(ProcessPool, LargeNumberOfTasks) {
