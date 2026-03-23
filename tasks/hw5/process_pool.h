@@ -197,6 +197,11 @@ public:
         using bound_t = decltype(std::bind(std::forward<F>(func), std::forward<Args>(args)...));
         using impl_t = task_impl<bound_t, result_t>;
 
+        static_assert((std::is_trivially_copyable_v<std::decay_t<Args>> && ...),
+                      "all arguments must be trivially copyable for cross-process transfer");
+        static_assert(std::is_trivially_copyable_v<result_t> || std::is_void_v<result_t>,
+                      "return type must be trivially copyable for cross-process transfer");
+
         static_assert(sizeof(impl_t) <= shared_arena::block_size, "task too large for arena block");
         static_assert(sizeof(shared_state<result_t>) <= shared_arena::block_size, "shared_state too large for arena block");
 
